@@ -201,8 +201,14 @@ module LogStash::Outputs::Elasticsearch
           when "delete"
             request = org.elasticsearch.action.delete.DeleteRequest.new(args[:_index])
             request.id(args[:_id])
-          #when "update"
-          #when "create"
+          when "update"
+            request = org.elasticsearch.action.update.UpdateRequest.new(args[:_index], args[:_type], args[:_id])
+            request.source(source)
+          when "create"
+            request = org.elasticsearch.action.index.IndexRequest.new(args[:_index])
+            request.id(args[:_id]) if args[:_id]
+            request.source(source)
+            request.create(true)
         end # case action
 
         request.type(args[:_type]) if args[:_type]

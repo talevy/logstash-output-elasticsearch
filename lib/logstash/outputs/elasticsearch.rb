@@ -415,6 +415,7 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
   # request.
   public
   def flush(actions, teardown = false)
+    puts "HERE FLUSHING"
     begin
       @logger.debug? and @logger.debug "Sending bulk of actions to client[#{@client_idx}]: #{@host[@client_idx]}"
       submit(actions)
@@ -548,10 +549,12 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
   # and once that thread is ended during the teardown process, a final call 
   # to this method is done upon teardown in the main thread.
   def retry_flush()
+    p @retry_queue.size
     unless @retry_queue.empty?
       buffer = @retry_queue.size.times.map do
         next_action, next_doc, next_event = @retry_queue.pop
         next_event['@metadata']['retry_count'] += 1
+        p next_event['@metadata']['retry_count']
 
         if next_event['@metadata']['retry_count'] > @max_retries
           @logger.error "too many attempts at sending event. dropping: #{next_event}"

@@ -650,3 +650,52 @@ describe "outputs/elasticsearch" do
     expect(settings.build.getAsMap["client.transport.sniff"]).to eq("true")
   end
 end
+
+describe "outputs/elasticsearch", :stress => true do
+  subject do
+    require "logstash/outputs/elasticsearch"
+    settings = {
+      "manage_template" => true,
+      "index" => "logstash-2014.11.17",
+      "template_overwrite" => true,
+      "protocol" => "http",
+      "host" => "localhost",
+      "retry_max_items" => 10,
+      "retry_max_interval" => 1,
+      "max_retries" => 3
+    }
+    next LogStash::Outputs::ElasticSearch.new(settings)
+  end
+
+  def generate_event()
+    [LogStash::Event.new("message" => "rand-#{rand(1000)}"), false]
+  end
+
+  it "should work under stress" do
+    num_events = 10000
+    rate = 1000 # events/sec
+
+    es_resp = [{"errors" => false},
+               {"errors" => true, "statuses" => [429]},
+               {"errors" => true, "statuses" => [503]}]
+    LogStash::Outputs::Elasticsearch::Protocols::HTTPClient
+      .any_instance.stub(:bulk).and_return(*es_resp)
+
+    subject.register
+
+    num_iter = 0
+    next_time = Time.now.to_f
+    loop do
+      break if num_iter > num_events
+      time = Time.now.to_f
+      if time >= next_time
+        new_event, fails = generate_event
+        subject.receive(new_event)
+        next_time = time + (-Math.log(1 - Random.rand) / rate)
+        num_iter += 1
+      end
+    end
+
+    subject.teardown
+  end
+end

@@ -3,8 +3,40 @@ require "ftw"
 require "logstash/plugin"
 require "logstash/json"
 require "stud/try"
+require "docker"
+
+CONTAINER_NAME = "es_" + rand(99).to_s
+IMAGE = "elasticsearch"
+TAG = "1.5.1"
+TRANSPORT_PORT = 9300
+HTTP_PORT = 9200
 
 describe "outputs/elasticsearch" do
+
+  RSpec.configure do |config|
+    config.before(:all, :elasticsearch => true) do
+      container = Docker::Container.create(
+        "name" => CONTAINER_NAME,
+        "Cmd" => ["run"],
+        "Image" => "#{IMAGE}:#{TAG}",
+        "ExposedPorts" => { "#{TRANSPORT_PORT}/tcp" => {}, "#{HTTP_PORT}/tcp" => {} },
+        "Tty" => true,
+        "HostConfig" => {
+          "PortBindings" => {
+            "#{TRANSPORT_PORT}/tcp" => [ { "HostIp" => "", "HostPort" => "#{TRANSPORT_PORT}" } ],
+            "#{HTTP_PORT}/tcp" => [ { "HostIp" => "", "HostPort" => "#{HTTP_PORT}" } ]
+          }
+        }
+      )
+      container.start
+    end
+
+    config.after(:all, :elasticsearch => true) do
+      container = Docker::Container.get(CONTAINER_NAME)
+      container.stop
+      container.delete(:force => true)
+    end
+  end
 
   it "should register" do
     output = LogStash::Plugin.lookup("output", "elasticsearch").new("embedded" => "false", "protocol" => "transport", "manage_template" => "false")

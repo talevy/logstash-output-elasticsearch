@@ -83,6 +83,9 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
 
   # Overwrite the current template with whatever is configured
   # in the `template` and `template_name` directives.
+  #
+  # When false, a template pattern will be generating using the 
+  # index pattern. 
   config :template_overwrite, :validate => :boolean, :default => false
 
   # The document ID for the index. Useful for overwriting existing entries in
@@ -393,7 +396,9 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
     end
     template_json = IO.read(@template).gsub(/\n/,'')
     template = LogStash::Json.load(template_json)
-    template['template'] = wildcard_substitute(@index)
+    unless @template_overwrite
+      template['template'] = wildcard_substitute(@index)
+    end
     @logger.info("Using mapping template", :template => template)
     return template
   end # def get_template
